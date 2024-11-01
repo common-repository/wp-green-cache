@@ -1,0 +1,1 @@
+a:7:{s:7:"enabled";s:1:"0";s:9:"cache_ttl";s:3:"480";s:13:"last_cleaning";i:1316553801;s:14:"clean_interval";s:5:"10080";s:8:"compress";s:46:"Compression Method 2 = gzcompress,gzuncompress";s:11:"perf_footer";s:1:"0";s:11:"include_php";s:0:"";}

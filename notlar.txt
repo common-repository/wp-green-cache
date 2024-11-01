@@ -1,0 +1,155 @@
+
+80 watt ampul yýllýk 77tl emisyondan ötürü 2 aðaç
+Her bir verimli lamba, bir yýlda 25 kilogram karbondioksit emisyonu azaltýr. Bu miktar bir
+aðacýn 1 yýlda emebileceði miktardan daha fazladýr.
+Günümüzde, yýllýk karbon emisyonu tutarý 6,3 milyar ton’un biraz üzerindedir 
+Yetiþkin Bir Aðaç Bir Saatte 2.3 Kg Karbondioksiti Bünyesine Alýr Yetiþkin normal bir aðaç bir saatte ortalama 2.3 kg karbondioksiti bünyesine alýr,
+On average, electricity sources emit 1.306lbs CO2 per kWh (0.0005925 metric tons CO2 per kWh)
+1 lbs = 453.59237 gr
+* 1 Kw elektrik tüketimi ise 0.6 kg Co2 eder
+* A tree 592,39163522 (0,6kg US Average) gr CO2 per kWh
+* Carbon emitting of tree 2.3 kgh
+
+
+
+wordpress: 
+------------------------------------------------------
+* Wordpress wp-config.php'deki WP_CACHE deðeri true ise kod akýþýný 
+öncelikli olarak wp-content/advanced-cache.php script'ine yönlendiriyor. 
+Script yerinde deðilse WP kod akýþý hata verip duruyor.
+Script bittikten sonra akýþ olaðan akýþýna devam ediyor.
+
+* http compress ve disk compress iki ayrý kavram açýsýndan yaklaþ.
+
+* iç uyarý ve bildirimleri ob_buffer üzeriden <!-- ile sayfa sonuna ekleyebilrisin.
+
+* encode sorunu file_get_content den kaynaklanýyor olabilir, fputs takýmýný kullanarak dene.
+
+* It has three invalidation method: all the cache, single post based and nothing but with control on home and archive pages invalidation.
+
+1blogcacher: 
+------------------------------------------------------
+Cache'leyeceði sayfanýn içeriðini almak için curl ile 
+farklý bir agentla kendine baðlanýyor. Agenta gonderilen content ve header'ý 
+ kaþeye yazýyor.
+
+super-cache:
+------------------------------------------------------
+// don't compress WP-Cache data files when PHP is already doing it
+if( ini_get( 'zlib.output_compression' ) ) 
+return false;
+zlib.output_compression  	PHP 4.0.5'dan beri kullanýlabilmektedir. öntanýmlý = 0
+
+ 
+hyper-cache:
+------------------------------------------------------
+konfigurasyonunu cache asamasýnda kullanabilmek için
+(bu asamada get_option wp altsistemi tam olarak yuklenmedigi icin cagrilamiyor)
+update_option'a ek olarak global deðiþkenleri advanced-cache.php dosyasýna da
+yazýyor. dolayýsýyla advanced-cache.php'nin her zaman yazýlabilir olmasý gerekli.
+
+kodlar
+------------------------------------------------------
+Çalýþan sorgularý fixed box içinde göster:
+<?php if (current_user_can('level_10')) { ?>
+<?php timer_stop(1); ?> saniyede, <?php echo get_num_queries(); ?> sorgu yapýldý.
+<?php global $wpdb; echo "<pre>"; print_r($wpdb->queries); echo "</pre>";  ?>
+<?php } ?>
+
+IF (OBC_ENABLE_BROWSER_CACHE){
+	@header("Cache-control: max-age=".OBC_EXPIRATION.", must-revalidate");
+	@header("Expires: ".gmdate("D, d M Y H:i:s",time()+OBC_EXPIRATION)." GMT");
+};IF ($date) @header("Last-Modified: {$date}");
+
+wp-cache
+------------------------------------------------------
+kukikili sayfalarý ayrý kaþeliyor. kuki sayfa içeriðine etki eden 
+bir argüman saðlýyor olabilir. compresyon kullanmýyor.
+deðiþmiþ sayfayý kaþeden bulup silmek için tüm kaþe dosyalarýný tarýyor.
+
+Kaþeyi etkileyen WP olaylarý
+------------------------------------------------------
+// Post ID is received
+add_action('publish_post', 'wp_cache_post_change', 0);
+add_action('edit_post', 'wp_cache_post_change', 0);
+add_action('delete_post', 'wp_cache_post_change', 0);
+add_action('publish_phone', 'wp_cache_post_change', 0); //Runs just after a post is added via email.
+// Coment ID is received
+add_action('trackback_post', 'wp_cache_get_postid_from_comment', 0);
+add_action('pingback_post', 'wp_cache_get_postid_from_comment', 0);
+add_action('comment_post', 'wp_cache_get_postid_from_comment', 0);
+add_action('edit_comment', 'wp_cache_get_postid_from_comment', 0);
+add_action('wp_set_comment_status', 'wp_cache_get_postid_from_comment', 0);
+// No post_id is available
+add_action('delete_comment', 'wp_cache_no_postid', 0);
+add_action('switch_theme', 'wp_cache_no_postid', 0);
+
+add_action('switch_theme', 'wp_cache_no_postid', 99); 
+add_action('edit_user_profile_update', 'wp_cache_no_postid', 99); 
+add_action('wp_cache_gc','wp_cache_gc_cron');
+
+function compact1 ($compacting) {
+	$compacting = preg_replace('!/\*[^*]*\*+([^/][^*]*\*+)*/!', '', $compacting);
+	$compacting = str_replace(array("\r\n", "\n", "\t", '  ', '    ', '    '), '', $compacting);
+	$compacting = str_replace(array('> ', ' <', ': ', '; ', ', ', ' {', '{ ', '} ', ' }'), array('>', '<', ':', ';',',' , '{', '{', '}', '}'), $compacting);
+	$compacting = str_replace("{", " {", $compacting);
+	return $compacting;
+}
+	
+Header('Last-Modified: '.gmdate('D, d M Y H:i:s', time()).' GMT');	
+
+function get_currentuserinfo() {
+	global $current_user;
+
+	if ( defined('XMLRPC_REQUEST') && XMLRPC_REQUEST )
+		return false;
+
+	if ( ! empty($current_user) )
+		return;
+
+	if ( ! $user = wp_validate_auth_cookie() ) {
+		 if ( empty($_COOKIE[LOGGED_IN_COOKIE]) || !$user = wp_validate_auth_cookie($_COOKIE[LOGGED_IN_COOKIE], 'logged_in') ) {
+		 	wp_set_current_user(0);
+		 	return false;
+		 }
+	}
+
+	wp_set_current_user($user);
+}
+endif;
+
+
+if ( !defined('LOGGED_IN_COOKIE') )
+	define('LOGGED_IN_COOKIE', 'wordpress_logged_in_' . COOKIEHASH);
+	
+	
+	
+HTTP/1.1 304 Not Modified
+Last-Modified: Thu, 20 Mar 2008 14:43:09 GMT
+Accept-Ranges: bytes
+ETag: "7ecd77b7988ac81:3800"
+Server: Microsoft-IIS/6.0
+X-Powered-By: ASP.NET
+Date: Mon, 16 Aug 2010 02:52:05 GMT	
+* Last Modified http header compatibility with 304 responses
+
+
+bellek kullanýmý
+----------------------------------------------------------
+	function SetMemoryUsage() {
+		if(function_exists("memory_get_peak_usage")) {
+			$this->_memoryUsage = memory_get_peak_usage(true);
+		} else if(function_exists("memory_get_usage")) {
+			$this->_memoryUsage =  memory_get_usage(true);
+		}
+	}
+	
+	
+Thanks for using this plugin! You've installed this plugin over a month ago. If it works and you are satisfied with the results, isn't it worth at least a few dollar? Donations help me to continue support and development of this free software! Sure, no problem!	
+
+cache inspect options menüsüne simge koymuþ
+
+404 veren sayfalarý cachleme
+php error warning görüntüleyen sayfalarý cachleme
+
+admin panelden logout olunca index cacheini sil, baþlýklarda [düzenle] yazýsý kalýyor.
